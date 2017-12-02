@@ -1,7 +1,7 @@
 package rocket_test
 
 import (
-	"github.com/joernlenoch/go-injectables"
+	"github.com/joernlenoch/rocket"
 	"testing"
 )
 
@@ -36,7 +36,7 @@ func TestName(t *testing.T) {
 	inj := rocket.NewInjector()
 	defer inj.Shutdown()
 
-	inj.Register(
+	inj.Provide(
 		&SomeService{},
 		&SomeOtherService{},
 	)

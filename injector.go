@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-const AnnotationTag = "injector"
+const AnnotationTag = "rocket"
 
 type (
 	Initer interface {
@@ -38,7 +38,7 @@ type (
 
 		//
 		//
-		Register(v ...interface{}) error
+		Provide(v ...interface{}) error
 
 		//
 		//
@@ -87,7 +87,7 @@ type StaticInjector struct {
 //
 //
 //
-func (inj *StaticInjector) Register(r ...interface{}) error {
+func (inj *StaticInjector) Provide(r ...interface{}) error {
 
 	for _, v := range r {
 
@@ -98,7 +98,7 @@ func (inj *StaticInjector) Register(r ...interface{}) error {
 
 		t = t.Elem()
 
-		// log.Print("[Services] Register: ", t)
+		// log.Print("[Services] Provide: ", t)
 
 		// if err := v.Init(inj); err != nil {
 		//	return errors.New(fmt.Sprintf("unable to register service '%s' : %v", v.ServiceName(), err))
