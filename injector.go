@@ -23,9 +23,14 @@ type (
 	//
 	//
 	Injector interface {
+
 		//
 		//
 		Get(name reflect.Type) (interface{}, error)
+
+		//
+		//
+		MustPrepare(i interface{})
 
 		//
 		//
@@ -49,7 +54,7 @@ type (
 // later use!
 func NewInjector() Injector {
 
-	inj := &defaultInjector{
+	inj := &StaticInjector{
 		services: []interface{}{},
 		debug:    false,
 	}
@@ -61,7 +66,7 @@ func NewInjector() Injector {
 //
 func NewInjectorWithConfig(cfg *Config) Injector {
 
-	inj := &defaultInjector{
+	inj := &StaticInjector{
 		services: []interface{}{},
 		debug:    cfg.Debug,
 	}
@@ -72,7 +77,7 @@ func NewInjectorWithConfig(cfg *Config) Injector {
 //
 //
 //
-type defaultInjector struct {
+type StaticInjector struct {
 	Injector
 
 	debug    bool
@@ -82,7 +87,7 @@ type defaultInjector struct {
 //
 //
 //
-func (inj *defaultInjector) Register(r ...interface{}) error {
+func (inj *StaticInjector) Register(r ...interface{}) error {
 
 	for _, v := range r {
 
@@ -119,10 +124,7 @@ func (inj *defaultInjector) Register(r ...interface{}) error {
 //
 //
 //
-func (inj *defaultInjector) Shutdown() {
-
-	log.Print("SHUTDOWN")
-
+func (inj *StaticInjector) Shutdown() {
 	for _, srv := range inj.services {
 		if withShutdown, ok := srv.(Shutdowner); ok {
 
@@ -138,7 +140,7 @@ func (inj *defaultInjector) Shutdown() {
 //
 //
 //
-func (inj *defaultInjector) Get(t reflect.Type) (interface{}, error) {
+func (inj *StaticInjector) Get(t reflect.Type) (interface{}, error) {
 
 	// log.Print("[Services] Request: ", t.String())
 	for _, srv := range inj.services {
@@ -157,7 +159,16 @@ func (inj *defaultInjector) Get(t reflect.Type) (interface{}, error) {
 //
 //
 //
-func (inj *defaultInjector) Prepare(i interface{}) error {
+func (inj *StaticInjector) MustPrepare(i interface{}) {
+	if err := inj.Prepare(i); err != nil {
+		panic(err)
+	}
+}
+
+//
+//
+//
+func (inj *StaticInjector) Prepare(i interface{}) error {
 
 	if i == nil {
 		return errors.New("the given object must not be nil")
