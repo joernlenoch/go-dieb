@@ -1,4 +1,4 @@
-package injectables
+package rocket
 
 import (
 	"errors"
@@ -181,8 +181,6 @@ func (inj *StaticInjector) Prepare(i interface{}) error {
 	el := reflect.ValueOf(i).Elem()
 	val := reflect.Indirect(reflect.ValueOf(i))
 	t := val.Type()
-
-	// log.Print("PREPARE: ",  val.Type().Name(), t.NumField())
 
 	for i := 0; i < t.NumField(); i++ {
 		f := val.Type().Field(i)
