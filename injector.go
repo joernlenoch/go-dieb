@@ -13,6 +13,11 @@ type (
 
 	Injectable interface {}
 
+	InjectableWithInit interface {
+		Injectable
+		Init() error
+	}
+
 	ServiceInjector interface {
 		Get(name reflect.Type) (Injectable, error)
 		Prepare(i interface{}) error
@@ -68,6 +73,13 @@ func (inj *defaultInjector) Register(v interface{}) error {
 	if err := inj.Prepare(v); err != nil {
 		return errors.New(fmt.Sprintf("unable to register service '%s': %v", t.String(), err))
 	}
+
+	if withInit, ok := v.(InjectableWithInit); !ok {
+		if err := withInit.Init(); err != nil {
+			return errors.New(fmt.Sprintf("unable to initialize service '%s': %v", t.String(), err))
+		}
+	}
+
 
 	inj.Services = append(inj.Services, v)
 
