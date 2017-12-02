@@ -7,29 +7,26 @@ import (
 	"fmt"
 )
 
-const FieldTag = "injector"
+const AnnotationTag = "injector"
 
 type (
 
-	Injectable interface {}
-
-	InjectableWithInit interface {
-		Injectable
+	Initer interface {
 		Init() error
 	}
 
 	ServiceInjector interface {
-		Get(name reflect.Type) (Injectable, error)
+		Get(name reflect.Type) (interface{}, error)
 		Prepare(i interface{}) error
 	}
 )
 
 // Create a new service injector and register all given services for
 // later use!
-func NewServiceInjector(services ...Injectable) ServiceInjector {
+func NewServiceInjector(services ...interface{}) ServiceInjector {
 
 	inj := &defaultInjector{
-		Services: []Injectable{},
+		Services: []interface{}{},
 	}
 
 	for _, s := range services {
@@ -48,7 +45,7 @@ func NewServiceInjector(services ...Injectable) ServiceInjector {
 type defaultInjector struct {
 	ServiceInjector
 
-	Services []Injectable
+	Services []interface{}
 }
 
 func (inj *defaultInjector) Register(v interface{}) error {
@@ -66,45 +63,36 @@ func (inj *defaultInjector) Register(v interface{}) error {
 	//	return errors.New(fmt.Sprintf("unable to register service '%s' : %v", v.ServiceName(), err))
 	// }
 
-	if _, ok := v.(Injectable); !ok {
-		return errors.New("the given service must implement the 'Injectable' interface")
-	}
-
 	if err := inj.Prepare(v); err != nil {
 		return errors.New(fmt.Sprintf("unable to register service '%s': %v", t.String(), err))
 	}
 
-	if withInit, ok := v.(InjectableWithInit); !ok {
+	if withInit, ok := v.(Initer); ok {
 		if err := withInit.Init(); err != nil {
 			return errors.New(fmt.Sprintf("unable to initialize service '%s': %v", t.String(), err))
 		}
 	}
 
-
-	inj.Services = append(inj.Services, v)
+	// Prepend the new service
+	inj.Services = append([]interface{}{v}, inj.Services...)
 
 	return nil
 }
 
-func (inj *defaultInjector) Get(t reflect.Type) (Injectable, error) {
+func (inj *defaultInjector) Get(t reflect.Type) (interface{}, error) {
 
 	// log.Print("[Services] Request: ", t.String())
-	var found Injectable
 	for _, srv := range inj.Services {
 		m := reflect.TypeOf(srv)
 
 		// log.Print("Search inside: ", reflect.TypeOf(srv))
 
 		if m.Implements(t) {
-			found = srv
+			return srv, nil
 		}
 	}
 
-	if found == nil {
-		return nil, errors.New("unable to find service that fulfills the requirements for :" + t.String())
-	}
-
-	return found, nil
+	return nil, errors.New("unable to find service that fulfills the requirements for :" + t.String())
 }
 
 func (inj *defaultInjector) Prepare(i interface{}) error {
@@ -126,18 +114,12 @@ func (inj *defaultInjector) Prepare(i interface{}) error {
 	for i := 0; i < t.NumField(); i++ {
 		f := val.Type().Field(i)
 
-		// Allow users to skip the injection
-		if f.Tag.Get(FieldTag) == ",skip" {
+		// Only work with annotated classes
+		if _, ok := f.Tag.Lookup(AnnotationTag); !ok {
 			continue
 		}
 
-		// Skip all interface inheritance
-		if f.Anonymous {
-			// log.Print("Skip:", f.Name, f.Type)
-			continue
-		}
-
-		// Skip all interface inheritance
+		// Throw error on hidden attributes
 		if !el.Field(i).CanSet() {
 			return errors.New(fmt.Sprintf("the field '%s' is not accessible", f.Name))
 		}
@@ -147,7 +129,7 @@ func (inj *defaultInjector) Prepare(i interface{}) error {
 			return err
 		}
 
-		// log.Print(f.Type, " => ", reflect.TypeOf(service))
+		log.Print("Found: ", f.Type, " => ", service)
 		el.Field(i).Set(reflect.ValueOf(service))
 	}
 

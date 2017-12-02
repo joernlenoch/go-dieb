@@ -7,23 +7,20 @@ import (
 
 type (
 
-	NotificationService interface {
-		injectables.Injectable
+	Notifier interface {
 		Hello(string) string
 	}
 
 	SomeService struct {
-		NotificationService
+		Notifier
 	}
 
 	SomeOtherService struct {
-		NotificationService
-
-		Previous NotificationService
+		Previous Notifier `injector:""`
 	}
 
 	SomeController struct {
-		Notify NotificationService
+		Notifier Notifier `injector:""`
 	}
 )
 
@@ -48,9 +45,9 @@ func TestName(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if ctrl.Notify.Hello("World") != "Hello World elloH" {
+	if ctrl.Notifier.Hello("World") != "Hello World elloH" {
 		t.FailNow()
 	}
 
-	t.Log(ctrl.Notify.Hello("Jones"))
+	t.Log(ctrl.Notifier.Hello("Jones"))
 }
