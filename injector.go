@@ -1,88 +1,147 @@
 package injectables
 
 import (
-	"log"
-	"reflect"
 	"errors"
 	"fmt"
+	"log"
+	"reflect"
+	"strings"
 )
 
 const AnnotationTag = "injector"
 
 type (
-
 	Initer interface {
 		Init() error
 	}
 
-	ServiceInjector interface {
+	Shutdowner interface {
+		Shutdown()
+	}
+
+	//
+	//
+	//
+	Injector interface {
+		//
+		//
 		Get(name reflect.Type) (interface{}, error)
+
+		//
+		//
 		Prepare(i interface{}) error
+
+		//
+		//
+		Register(v ...interface{}) error
+
+		//
+		//
+		Shutdown()
+	}
+
+	Config struct {
+		Debug bool
 	}
 )
 
 // Create a new service injector and register all given services for
 // later use!
-func NewServiceInjector(services ...interface{}) ServiceInjector {
+func NewInjector() Injector {
 
 	inj := &defaultInjector{
-		Services: []interface{}{},
-	}
-
-	for _, s := range services {
-		if err := inj.Register(s); err != nil {
-			log.Fatal(err)
-		}
+		services: []interface{}{},
+		debug:    false,
 	}
 
 	return inj
 }
 
+//
+//
+func NewInjectorWithConfig(cfg *Config) Injector {
+
+	inj := &defaultInjector{
+		services: []interface{}{},
+		debug:    cfg.Debug,
+	}
+
+	return inj
+}
 
 //
 //
 //
 type defaultInjector struct {
-	ServiceInjector
+	Injector
 
-	Services []interface{}
+	debug    bool
+	services []interface{}
 }
 
-func (inj *defaultInjector) Register(v interface{}) error {
+//
+//
+//
+func (inj *defaultInjector) Register(r ...interface{}) error {
 
-	t := reflect.TypeOf(v)
-	if t.Kind() != reflect.Ptr {
-		return errors.New(fmt.Sprintf("services must be given as pointer: %v", t.Kind()))
-	}
+	for _, v := range r {
 
-	t = t.Elem()
-
-	// log.Print("[Services] Register: ", t)
-
-	// if err := v.Init(inj); err != nil {
-	//	return errors.New(fmt.Sprintf("unable to register service '%s' : %v", v.ServiceName(), err))
-	// }
-
-	if err := inj.Prepare(v); err != nil {
-		return errors.New(fmt.Sprintf("unable to register service '%s': %v", t.String(), err))
-	}
-
-	if withInit, ok := v.(Initer); ok {
-		if err := withInit.Init(); err != nil {
-			return errors.New(fmt.Sprintf("unable to initialize service '%s': %v", t.String(), err))
+		t := reflect.TypeOf(v)
+		if t.Kind() != reflect.Ptr {
+			return errors.New(fmt.Sprintf("services must be given as pointer: %v", t.Kind()))
 		}
-	}
 
-	// Prepend the new service
-	inj.Services = append([]interface{}{v}, inj.Services...)
+		t = t.Elem()
+
+		// log.Print("[Services] Register: ", t)
+
+		// if err := v.Init(inj); err != nil {
+		//	return errors.New(fmt.Sprintf("unable to register service '%s' : %v", v.ServiceName(), err))
+		// }
+
+		if err := inj.Prepare(v); err != nil {
+			return errors.New(fmt.Sprintf("unable to register service '%s': %v", t.String(), err))
+		}
+
+		if withInit, ok := v.(Initer); ok {
+			if err := withInit.Init(); err != nil {
+				return errors.New(fmt.Sprintf("unable to initialize service '%s': %v", t.String(), err))
+			}
+		}
+
+		// Prepend the new service
+		inj.services = append([]interface{}{v}, inj.services...)
+	}
 
 	return nil
 }
 
+//
+//
+//
+func (inj *defaultInjector) Shutdown() {
+
+	log.Print("SHUTDOWN")
+
+	for _, srv := range inj.services {
+		if withShutdown, ok := srv.(Shutdowner); ok {
+
+			if inj.debug {
+				log.Printf("[Injectables] Shutdown '%s'", reflect.TypeOf(srv))
+			}
+
+			withShutdown.Shutdown()
+		}
+	}
+}
+
+//
+//
+//
 func (inj *defaultInjector) Get(t reflect.Type) (interface{}, error) {
 
 	// log.Print("[Services] Request: ", t.String())
-	for _, srv := range inj.Services {
+	for _, srv := range inj.services {
 		m := reflect.TypeOf(srv)
 
 		// log.Print("Search inside: ", reflect.TypeOf(srv))
@@ -95,6 +154,9 @@ func (inj *defaultInjector) Get(t reflect.Type) (interface{}, error) {
 	return nil, errors.New("unable to find service that fulfills the requirements for :" + t.String())
 }
 
+//
+//
+//
 func (inj *defaultInjector) Prepare(i interface{}) error {
 
 	if i == nil {
@@ -115,7 +177,11 @@ func (inj *defaultInjector) Prepare(i interface{}) error {
 		f := val.Type().Field(i)
 
 		// Only work with annotated classes
-		if _, ok := f.Tag.Lookup(AnnotationTag); !ok {
+		tag, ok := f.Tag.Lookup(AnnotationTag)
+		if !ok {
+			if inj.debug {
+				log.Printf("[Injectables] Skip '%s': No Annotation found", f.Name)
+			}
 			continue
 		}
 
@@ -126,10 +192,23 @@ func (inj *defaultInjector) Prepare(i interface{}) error {
 
 		service, err := inj.Get(f.Type)
 		if err != nil {
+			// Ignore errors when marked as optional
+			if strings.Contains(tag, ",optional") {
+
+				if inj.debug {
+					log.Printf("[Injectables] Skip '%s': Not found; Marked as optional", f.Name)
+				}
+
+				continue
+			}
+
 			return err
 		}
 
-		// log.Print("Found: ", f.Type, " => ", service)
+		if inj.debug {
+			log.Printf("[Injectables] Resolve '%s' with '%s'", f.Name, reflect.TypeOf(service))
+		}
+
 		el.Field(i).Set(reflect.ValueOf(service))
 	}
 

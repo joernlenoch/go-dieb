@@ -1,12 +1,11 @@
 package injectables_test
 
 import (
-	"testing"
 	"github.com/joernlenoch/go-injectables"
+	"testing"
 )
 
 type (
-
 	Notifier interface {
 		Hello(string) string
 	}
@@ -32,10 +31,12 @@ func (s SomeOtherService) Hello(n string) string {
 	return s.Previous.Hello(n + " elloH")
 }
 
-
 func TestName(t *testing.T) {
 
-	inj := injectables.NewServiceInjector(
+	inj := injectables.NewInjector()
+	defer inj.Shutdown()
+
+	inj.Register(
 		&SomeService{},
 		&SomeOtherService{},
 	)
