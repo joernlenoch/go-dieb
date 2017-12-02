@@ -129,7 +129,7 @@ func (inj *defaultInjector) Prepare(i interface{}) error {
 			return err
 		}
 
-		log.Print("Found: ", f.Type, " => ", service)
+		// log.Print("Found: ", f.Type, " => ", service)
 		el.Field(i).Set(reflect.ValueOf(service))
 	}
 
