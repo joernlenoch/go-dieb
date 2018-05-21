@@ -1,4 +1,4 @@
-package rocket
+package dieb
 
 import (
 	"errors"
@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-const AnnotationTag = "rocket"
+var AnnotationTags = []string{"rocket", "dieb", "inject"}
 
 type (
 	Initer interface {
@@ -185,8 +185,18 @@ func (inj *StaticInjector) Prepare(i interface{}) error {
 	for i := 0; i < t.NumField(); i++ {
 		f := val.Type().Field(i)
 
+		var ok bool
+		var tag string
+
 		// Only work with annotated classes
-		tag, ok := f.Tag.Lookup(AnnotationTag)
+		for _, tagName := range AnnotationTags {
+			tag, ok = f.Tag.Lookup(tagName)
+			if ok {
+				break
+			}
+
+		}
+
 		if !ok {
 			if inj.debug {
 				log.Printf("[Injectables] Skip '%s': No Annotation found", f.Name)

@@ -1,18 +1,18 @@
-## rocket
+## Dieb (former 'rocket')
 
-Simple hierarchical dependency injector based on go's reflection system and influenced by common dependency injection systems.
+Simple hierarchical dependency injector based on go's reflection system and influenced by common dependency injection handlers.
+ 
+Focuses on a clear and reusable structure, without pitfalls.
 
-## Disclaimer
+## Note
 
-This is an very early version of an tool that I developed for my REST APIs where I was unable to provide proper
-dependency indirection.
-
-This is **not** stable yet and may change in the near future.
+Currently in production in 3 of my larger projects (15k loc+). Works very reliable.  - len
 
 ## Roadmap
 
-[] 100% test coverage
-[] Travis-CI
+[ ] 100% test coverage
+
+[ ] Travis-CI
 
 ## Usage
 
@@ -37,7 +37,7 @@ func (s *StaticNamingService) Names() []string {
 
 Create a new injector and provide instances of the service implementations.
 ```go
-injector := rocket.NewInjector()
+injector := dieb.NewInjector()
 defer injector.Shutdown()
 
 injector.Provide(
@@ -49,7 +49,7 @@ injector.Provide(
 Use the injector to fulfill dependencies.
 ```go
 type NamesController struct{
-  namingService NamingService `rocket:""`
+  namingService NamingService `dieb:""`
 }
 
 var ctrl NamesController
@@ -67,7 +67,7 @@ used service can be injected in the newest one to be used.
 
 ```go
 BetterNamingService struct {
-    Previous NamingService `rocket:""`
+    Previous NamingService `dieb:""`
 }
 
 func (s *BetterNamingService) Names() []string {
@@ -78,7 +78,7 @@ func (s *BetterNamingService) Names() []string {
 Will return ["Carl", "Michael", "Susanne", "Vivian", "Marcus", "Nani"] when used like this.
 
 ```go
-injector := rocket.NewInjector()
+injector := dieb.NewInjector()
 defer injector.Shutdown()
 
 injector.Provide(&StaticNamingService{})
@@ -90,12 +90,12 @@ injector.Provide(&BetterNamingSystem{})
 
 ## Optional dependencies
 
-When declaring dependencies with the `rocket` annotation, the option `rocket:",optional"` can be used to make the injector ignore the dependency if it can not be resolved.
+When declaring dependencies with the `dieb` annotation, the option `dieb:",optional"` can be used to make the injector ignore the dependency if it can not be resolved.
 
 Example
 ```go
 type SomeCriticalController struct{
-  logger Logger `rocket:",optional"`
+  logger Logger `dieb:",optional"`
 }
 ```
 
@@ -105,15 +105,16 @@ Sometimes, it may be useful to construct or deconstruct services before and afte
 
 ```go
 type DatabaseService struct{
-  rocket.Initer
   mysql *sqlx.DB
 }
 
+// dieb.Initer
 func (d *DatabaseService) Init() error {
   // ... connect to the database
   return nil
 }
 
+// dieb.Shutdowner
 func (d *DatabaseService) Shutdown() {
   // ... close all open connections ...
 }

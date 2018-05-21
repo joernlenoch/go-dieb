@@ -1,7 +1,7 @@
-package rocket_test
+package dieb_test
 
 import (
-	"github.com/joernlenoch/rocket"
+	"github.com/joernlenoch/go-dieb"
 	"testing"
 )
 
@@ -15,11 +15,11 @@ type (
 	}
 
 	SomeOtherService struct {
-		Previous Notifier `injector:""`
+		Previous Notifier `inject:""`
 	}
 
 	SomeController struct {
-		Notifier Notifier `injector:""`
+		Notifier Notifier `dieb:""`
 	}
 )
 
@@ -33,7 +33,7 @@ func (s SomeOtherService) Hello(n string) string {
 
 func TestName(t *testing.T) {
 
-	inj := rocket.NewInjector()
+	inj := dieb.NewInjector()
 	defer inj.Shutdown()
 
 	inj.Provide(
