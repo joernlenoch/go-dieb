@@ -139,7 +139,7 @@ func (inj *StaticInjector) Get(t reflect.Type) (interface{}, error) {
 		}
 	}
 
-	return nil, errors.New("unable to find service that fulfills the requirements for :" + t.String())
+	return nil, errors.New(fmt.Sprintf("unable to find service that fulfills the requirements for '%s'", t.String()))
 }
 
 func (inj *StaticInjector) MustPrepare(i interface{}) {
@@ -201,7 +201,7 @@ func (inj *StaticInjector) Prepare(target interface{}) error {
 				continue
 			}
 
-			return errors.New(fmt.Sprintf("unable to resolve dependency for %s: %s", t.Name(), err.Error()))
+			return errors.New(fmt.Sprintf("unable to resolve dependency for '%s': %s", t.Name(), err.Error()))
 		}
 
 		if inj.debug {
