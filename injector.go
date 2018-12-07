@@ -11,47 +11,46 @@ import (
 var AnnotationTags = []string{"rocket", "dieb", "inject"}
 
 type (
+
+	// Initer describes all services that have an constructor-style method when
+	// resolved.
 	Initer interface {
 		Init() error
 	}
 
+	// Shutdowner describe all services that have extra desconstruct-style methods
+	// when shut down.
 	Shutdowner interface {
 		Shutdown()
 	}
 
-	//
-	//
-	//
+	// Injector is a interface for an service provider.
 	Injector interface {
 
-		//
-		//
+		// Get returns a instance of the requested type.
 		Get(name reflect.Type) (interface{}, error)
 
-		//
-		//
+		// MustPrepare tries to resolve all dependencies or panics.
 		MustPrepare(i interface{})
 
-		//
-		//
+		// Prepare tries to resolve all dependencies.
 		Prepare(i interface{}) error
 
-		//
-		//
+		// Provide add additional services, resolve their dependencies, and call the init method
+		// of given services.
 		Provide(v ...interface{}) error
 
-		//
-		//
+		// Shutdown destroy the injector and calls all
 		Shutdown()
 	}
 
+	// Config is a configuration for the static injector
 	Config struct {
 		Debug bool
 	}
 )
 
-// Create a new service injector and register all given services for
-// later use!
+// NewInjector creates a new empty injector.
 func NewInjector() Injector {
 
 	inj := &StaticInjector{
@@ -62,8 +61,7 @@ func NewInjector() Injector {
 	return inj
 }
 
-//
-//
+// NewInjectorWithConfig retcreates a new empty injector with the given configuration.
 func NewInjectorWithConfig(cfg *Config) Injector {
 
 	inj := &StaticInjector{
@@ -74,9 +72,6 @@ func NewInjectorWithConfig(cfg *Config) Injector {
 	return inj
 }
 
-//
-//
-//
 type StaticInjector struct {
 	Injector
 
@@ -84,9 +79,6 @@ type StaticInjector struct {
 	services []interface{}
 }
 
-//
-//
-//
 func (inj *StaticInjector) Provide(r ...interface{}) error {
 
 	for _, v := range r {
@@ -121,9 +113,6 @@ func (inj *StaticInjector) Provide(r ...interface{}) error {
 	return nil
 }
 
-//
-//
-//
 func (inj *StaticInjector) Shutdown() {
 	for _, srv := range inj.services {
 		if withShutdown, ok := srv.(Shutdowner); ok {
@@ -137,9 +126,6 @@ func (inj *StaticInjector) Shutdown() {
 	}
 }
 
-//
-//
-//
 func (inj *StaticInjector) Get(t reflect.Type) (interface{}, error) {
 
 	// log.Print("[Services] Request: ", t.String())
@@ -156,30 +142,24 @@ func (inj *StaticInjector) Get(t reflect.Type) (interface{}, error) {
 	return nil, errors.New("unable to find service that fulfills the requirements for :" + t.String())
 }
 
-//
-//
-//
 func (inj *StaticInjector) MustPrepare(i interface{}) {
 	if err := inj.Prepare(i); err != nil {
 		panic(err)
 	}
 }
 
-//
-//
-//
-func (inj *StaticInjector) Prepare(i interface{}) error {
+func (inj *StaticInjector) Prepare(target interface{}) error {
 
-	if i == nil {
+	if target == nil {
 		return errors.New("the given object must not be nil")
 	}
 
-	if reflect.TypeOf(i).Kind() != reflect.Ptr {
+	if reflect.TypeOf(target).Kind() != reflect.Ptr {
 		return errors.New("you must provide a pointer interface")
 	}
 
-	el := reflect.ValueOf(i).Elem()
-	val := reflect.Indirect(reflect.ValueOf(i))
+	el := reflect.ValueOf(target).Elem()
+	val := reflect.Indirect(reflect.ValueOf(target))
 	t := val.Type()
 
 	for i := 0; i < t.NumField(); i++ {
@@ -221,7 +201,7 @@ func (inj *StaticInjector) Prepare(i interface{}) error {
 				continue
 			}
 
-			return err
+			return errors.New(fmt.Sprintf("unable to resolve dependency for %t: %s", target, err.Error()))
 		}
 
 		if inj.debug {
