@@ -201,7 +201,7 @@ func (inj *StaticInjector) Prepare(target interface{}) error {
 				continue
 			}
 
-			return errors.New(fmt.Sprintf("unable to resolve dependency for %s: %s", reflect.TypeOf(target).Name(), err.Error()))
+			return errors.New(fmt.Sprintf("unable to resolve dependency for %s: %s", t.Name(), err.Error()))
 		}
 
 		if inj.debug {
