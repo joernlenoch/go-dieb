@@ -126,9 +126,14 @@ func (inj *StaticInjector) Get(t reflect.Type) (interface{}, error) {
 		m := reflect.TypeOf(srv)
 
 		// log.Print("Search inside: ", reflect.TypeOf(srv))
-
-		if m.Implements(t) {
-			return srv, nil
+		if t.Kind() == reflect.Interface {
+			if m.Implements(t) {
+				return srv, nil
+			}
+		} else {
+			if m.String() == t.String() {
+				return srv, nil
+			}
 		}
 	}
 

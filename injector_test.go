@@ -21,13 +21,15 @@ type (
 	}
 
 	SomeController struct {
-		Notifier Notifier `dieb:""`
+		Notifier      Notifier     `dieb:""`
+		DirectService *SomeService `dieb:""`
 	}
 )
 
-func (s *SomeOtherService) Init(injector dieb.Injector, someSvc Notifier) error {
+func (s *SomeOtherService) Init(injector dieb.Injector, someSvc Notifier, service *SomeService) error {
 
-	log.Print(someSvc.Hello("User"))
+	log.Print(someSvc.Hello("Indirect Dependancy"))
+	log.Print(service.Hello("Direct Dependancy"))
 
 	return nil
 }
@@ -64,5 +66,6 @@ func TestName(t *testing.T) {
 		t.FailNow()
 	}
 
-	t.Log(ctrl.Notifier.Hello("Jones"))
+	t.Log(ctrl.Notifier.Hello("Indirect"))
+	t.Log(ctrl.DirectService.Hello("Direct"))
 }
