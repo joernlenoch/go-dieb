@@ -295,5 +295,10 @@ func NewInjectorWithConfig(cfg *Config) Injector {
 		debug:    cfg.Debug,
 	}
 
+	// Provide itself as injector
+	if err := inj.Provide(inj); err != nil {
+		panic(err)
+	}
+
 	return inj
 }
