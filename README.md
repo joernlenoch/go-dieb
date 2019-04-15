@@ -4,19 +4,32 @@ Simple hierarchical dependency injector based on go's reflection system and infl
  
 Focuses on a clear and reusable structure, without pitfalls.
 
-## Note
+## Personal Note
 
-Currently in production in 3 of my larger projects (15k loc+). Works very reliable.  - len
+> Currently in production in 3 of my larger projects (35k loc+).
+> 
+> Works very reliable and we never had any issues.
+>
+> -- len
+ 
 
 ## Roadmap
 
-[ ] 100% test coverage
+- [x] indirect dependancies via interface
 
-[ ] Travis-CI
+- [x] direct dependancies via pointer
+
+- [x] preparation of structs
+
+- [x] constructor methods
+
+- [ ] 100% test coverage
+
+- [ ] Travis-CI
 
 ## Usage
 
-**`Reminder: Services can depend on other services!`**
+**`Reminder: Services can depend on other services and references!`**
 
 Create a new service definition. This way, it can be replaced during testing.
 
@@ -49,7 +62,8 @@ injector.Provide(
 Use the injector to fulfill dependencies.
 ```go
 type NamesController struct{
-  namingService NamingService `dieb:""`
+  NamingService       NamingService `dieb:""` // This is an indirect dependancy
+  StaticNamingService *StaticNamingService `dieb:""` // This is a direct dependancy
 }
 
 var ctrl NamesController
@@ -57,8 +71,32 @@ if err := injector.Prepare(&ctrl); err != nil {
   panic(err)
 }
 
-log.Print(ctrl.namingService.Names())
+log.Print(ctrl.NamingService.Names())
 ```
+
+## Init / Constructor methods
+
+Since Version `v2.1.0` it is possible to inject via method.
+
+```go
+func ConstructorMethod(/* deps */) error {
+  
+  // [...]
+  // Do something with the deps
+  // [...]
+  
+  return nil
+}
+
+err := inj.PrepareFunc(ConstructorMethod)
+if err != nil {
+  panic(err)
+}
+
+```
+
+**The `Init(..) error` method will automatically be called when a service is provided!**
+
 
 ## Hierarchical injection / Overwrite injected services
 
@@ -88,6 +126,11 @@ injector.Provide(&StaticNamingService{})
 injector.Provide(&BetterNamingSystem{})
 ```
 
+#### Use-Cases
+
+A typical example could be a `StorageService` and a `CachingService` that provides a storage interface,
+but applies a custom caching strategy.
+
 ## Optional dependencies
 
 When declaring dependencies with the `dieb` annotation, the option `dieb:",optional"` can be used to make the injector ignore the dependency if it can not be resolved.
@@ -110,6 +153,12 @@ type DatabaseService struct{
 
 // dieb.Initer
 func (d *DatabaseService) Init() error {
+  // ... connect to the database
+  return nil
+}
+
+// custom Init with dependancies
+func (d *DatabaseService) Init(injector dieb.Injector, db *SomeService) error {
   // ... connect to the database
   return nil
 }
