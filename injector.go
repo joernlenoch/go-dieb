@@ -30,17 +30,23 @@ type (
 		// Get returns a instance of the requested type.
 		Get(name reflect.Type) (interface{}, error)
 
+		// GetByName returns the service by the provided name
+		GetByName(s string) (interface{}, error)
+
 		// MustPrepare tries to resolve all dependencies or panics.
 		MustPrepare(i interface{})
 
-		// Prepare tries to resolve all dependencies.
+		// Prepare tries to resolve all dependencies for the given struct
 		Prepare(i interface{}) error
+
+		// PrepareFunc calls the method will all dependencies resolved
+		PrepareFunc(i interface{}) error
 
 		// Provide add additional services, resolve their dependencies, and call the init method
 		// of given services.
 		Provide(v ...interface{}) error
 
-		// Shutdown destroy the injector and calls all
+		// Shutdown destroy the injector and calls all shutdown methods
 		Shutdown()
 	}
 
@@ -50,31 +56,7 @@ type (
 	}
 )
 
-// NewInjector creates a new empty injector.
-func NewInjector() Injector {
-
-	inj := &StaticInjector{
-		services: []interface{}{},
-		debug:    false,
-	}
-
-	return inj
-}
-
-// NewInjectorWithConfig retcreates a new empty injector with the given configuration.
-func NewInjectorWithConfig(cfg *Config) Injector {
-
-	inj := &StaticInjector{
-		services: []interface{}{},
-		debug:    cfg.Debug,
-	}
-
-	return inj
-}
-
 type StaticInjector struct {
-	Injector
-
 	debug    bool
 	services []interface{}
 }
@@ -97,13 +79,18 @@ func (inj *StaticInjector) Provide(r ...interface{}) error {
 		// }
 
 		if err := inj.Prepare(v); err != nil {
-			return errors.New(fmt.Sprintf("unable to register service '%s': %v", t.String(), err))
+			return fmt.Errorf("unable to register service '%s': %v", t.String(), err)
 		}
 
+		var err error
 		if withInit, ok := v.(Initer); ok {
-			if err := withInit.Init(); err != nil {
-				return errors.New(fmt.Sprintf("unable to initialize service '%s': %v", t.String(), err))
-			}
+			err = withInit.Init()
+		} else if initMethod := reflect.ValueOf(v).MethodByName("Init"); initMethod.IsValid() {
+			err = inj.PrepareFunc(initMethod)
+		}
+
+		if err != nil {
+			return fmt.Errorf("unable to initialize service '%s': %v", t.String(), err)
 		}
 
 		// Prepend the new service
@@ -115,6 +102,12 @@ func (inj *StaticInjector) Provide(r ...interface{}) error {
 
 func (inj *StaticInjector) Shutdown() {
 	for _, srv := range inj.services {
+
+		// Skip the injector
+		if srv == inj {
+			continue
+		}
+
 		if withShutdown, ok := srv.(Shutdowner); ok {
 
 			if inj.debug {
@@ -140,6 +133,22 @@ func (inj *StaticInjector) Get(t reflect.Type) (interface{}, error) {
 	}
 
 	return nil, errors.New(fmt.Sprintf("unable to find service that fulfills the requirements for '%s'", t.String()))
+}
+
+func (inj *StaticInjector) GetByName(s string) (interface{}, error) {
+
+	// log.Print("[Services] Request: ", t.String())
+	for _, srv := range inj.services {
+		m := reflect.TypeOf(srv)
+
+		log.Print("Search inside: ", m.String())
+
+		if strings.HasSuffix(m.String(), s) {
+			return srv, nil
+		}
+	}
+
+	return nil, errors.New(fmt.Sprintf("unable to find service that has the name '%s'", s))
 }
 
 func (inj *StaticInjector) MustPrepare(i interface{}) {
@@ -212,4 +221,79 @@ func (inj *StaticInjector) Prepare(target interface{}) error {
 	}
 
 	return nil
+}
+
+func (inj *StaticInjector) PrepareFunc(fn interface{}) error {
+
+	var method reflect.Value
+
+	if reflected, ok := fn.(reflect.Value); ok {
+		method = reflected
+	} else {
+		method = reflect.ValueOf(fn)
+	}
+
+	if method.Kind() != reflect.Func {
+		return fmt.Errorf("can only prepare methods, %s given", method.Kind())
+	}
+
+	tm := method.Type()
+
+	if tm.NumOut() != 1 {
+		return fmt.Errorf("method '%s' must return a single error, got %d return values", tm.String(), tm.NumOut())
+	}
+
+	if tm.Out(0).Kind() != reflect.Interface {
+		return fmt.Errorf("method '%s' must return a single error, not '%s'", tm.String(), tm.Out(0).Kind())
+	}
+
+	params := make([]reflect.Value, tm.NumIn())
+	for i := 0; i < tm.NumIn(); i++ {
+		typeIn := tm.In(i)
+
+		if typeIn.Kind() != reflect.Ptr && typeIn.Kind() != reflect.Interface {
+			return fmt.Errorf("required type must be a pointer or interface: %s", typeIn.String())
+		}
+
+		param, err := inj.Get(typeIn)
+		if err != nil {
+			return fmt.Errorf("unable to fullfil method '%s': %v", tm.String(), err)
+		}
+		params[i] = reflect.ValueOf(param)
+	}
+
+	if ret := method.Call(params); !ret[0].IsNil() {
+		return errors.New(fmt.Sprintf("unable to fullfil method '%s': %v", tm.String(), ret[0]))
+	}
+
+	return nil
+}
+
+var _ Injector = (*StaticInjector)(nil)
+
+// NewInjector creates a new empty injector.
+func NewInjector() Injector {
+
+	inj := &StaticInjector{
+		services: []interface{}{},
+		debug:    false,
+	}
+
+	// Provide itself as injector
+	if err := inj.Provide(inj); err != nil {
+		panic(err)
+	}
+
+	return inj
+}
+
+// NewInjectorWithConfig retcreates a new empty injector with the given configuration.
+func NewInjectorWithConfig(cfg *Config) Injector {
+
+	inj := &StaticInjector{
+		services: []interface{}{},
+		debug:    cfg.Debug,
+	}
+
+	return inj
 }

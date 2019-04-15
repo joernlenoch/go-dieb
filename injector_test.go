@@ -2,6 +2,8 @@ package dieb_test
 
 import (
 	"github.com/joernlenoch/go-dieb"
+	"github.com/stretchr/testify/assert"
+	"log"
 	"testing"
 )
 
@@ -23,6 +25,13 @@ type (
 	}
 )
 
+func (s *SomeOtherService) Init(injector dieb.Injector, someSvc Notifier) error {
+
+	log.Print(someSvc.Hello("User"))
+
+	return nil
+}
+
 func (s SomeService) Hello(n string) string {
 	return "Hello " + n
 }
@@ -36,10 +45,15 @@ func TestName(t *testing.T) {
 	inj := dieb.NewInjector()
 	defer inj.Shutdown()
 
-	inj.Provide(
+	err := inj.Provide(
 		&SomeService{},
 		&SomeOtherService{},
 	)
+
+	if ok := assert.NoError(t, err); !ok {
+		t.Fatal()
+		return
+	}
 
 	var ctrl SomeController
 	if err := inj.Prepare(&ctrl); err != nil {
